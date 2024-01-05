@@ -7,11 +7,11 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 const registerUser = asyncHandler(async (req, res) => {
   // check for images, check for avatar
 
-// get user details from frontend
+  // get user details from frontend
   const { fullname, email, username, password } = req.body;
-  console.log("email: ", email);
+  //console.log("email: ", email);
 
-// validation - not empty
+  // validation - not empty
   if (
     [fullname, email, username, password].some((field) => field?.trim() === "")
   ) {
@@ -19,35 +19,40 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   // check if user already exists: username and email
-  const existedUser = await User.findOne({ 
-    $or: [
-        { username },
-        { email }
-    ]
-  })
+  const existedUser = await User.findOne({
+    $or: [{ username }, { email }],
+  });
 
-  if(existedUser) {
+  if (existedUser) {
     throw new ApiError(409, "User already exists");
   }
 
-// upload them to cloudinary, avatar
+  // upload them to cloudinary, avatar
 
   const avatarLocalPath = req.files?.avatar[0]?.path;
-  const converImageLocalPath = req.files?.coverImage[0]?.path;
+  //const coverImageLocalPath = req.files?.coverImage[0]?.path;
 
-  if ( !avatarLocalPath ) {
+  let coverImageLocalPath;
+  if (
+    req.files &&
+    Array.isArray(req.files.coverImage) &&
+    req.files.coverImage.length > 0
+  ) {
+    coverImageLocalPath = req.files.coverImage[0].path;
+  }
+
+  if (!avatarLocalPath) {
     throw new ApiError(400, "Avatar is required");
   }
 
   const avatar = await uploadOnCloudinary(avatarLocalPath);
-  const coverImage = await uploadOnCloudinary(converImageLocalPath);
+  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
   if (!avatar) {
     throw new ApiError(400, "Avatar upload failed");
   }
 
-    // create user object - create entry in db
-
+  // create user object - create entry in db
 
   const user = await User.create({
     fullname,
@@ -55,27 +60,24 @@ const registerUser = asyncHandler(async (req, res) => {
     username: username.toLowerCase(),
     password,
     avatar: avatar.url,
-    coverImage: coverImage?.url
+    coverImage: coverImage?.url,
   });
 
-    // remove password and refresh token field from response
-
+  // remove password and refresh token field from response
 
   const createdUser = await User.findById(user._id).select(
-    "-password -refreshToken");
+    "-password -refreshToken"
+  );
 
-      // check for user creation
+  // check for user creation
   if (!createdUser) {
     throw new ApiError(500, "Something went wrong while registering a user");
   }
-      // return response
+  // return response
 
-    return res.status(201).json(
-        new ApiResponse(201, createdUser, "User created successfully")
-    );  
-
-
-
+  return res
+    .status(201)
+    .json(new ApiResponse(201, createdUser, "User created successfully"));
 });
 
 export { registerUser };
